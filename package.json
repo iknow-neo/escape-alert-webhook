@@ -1,0 +1,19 @@
+{
+  "name": "escape-alert-webhook",
+  "version": "1.0.0",
+  "description": "Webhook für Escape Alert System - leitet Manus AI Benachrichtigungen an Telegram weiter",
+  "main": "api/webhook.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"No tests specified\""
+  },
+  "keywords": [
+    "webhook",
+    "telegram",
+    "alert",
+    "manus"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+

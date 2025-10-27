@@ -1,48 +1,100 @@
-// api/webhook.js
-// Simple Vercel Serverless webhook forwarder for Manus AI -> Telegram
-// This file uses environment variables for sensitive values.
-//
-// Set environment variables in Vercel (Project Settings -> Environment Variables):
-// TELEGRAM_TOKEN    -> your Telegram Bot token (do NOT commit this to git)
-// TELEGRAM_CHAT_ID  -> your personal chat id or group chat id
-//
+// Telegram Webhook Handler für Escape Alert System
+// Empfängt Nachrichten von Manus AI und leitet sie an Telegram weiter
+
 export default async function handler(req, res) {
+  // Nur POST-Requests erlauben
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Only POST allowed' });
+    return res.status(405).json({ 
+      error: 'Method Not Allowed',
+      message: 'Nur POST-Requests werden akzeptiert' 
+    });
   }
 
-  const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN || 'YOUR_TELEGRAM_TOKEN';
-  const CHAT_ID = process.env.TELEGRAM_CHAT_ID || 'YOUR_CHAT_ID';
-
   try {
-    const body = req.body || {};
-    const level = body.level || 'info';
-    const title = body.title || body.matched_phrase || 'Alert';
-    const excerpt = body.excerpt || '';
-    const url = body.url || '';
-    const source = body.source || '';
+    // Telegram Bot Konfiguration aus Umgebungsvariablen
+    const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+    const CHAT_ID = process.env.CHAT_ID;
 
-    // sanitize / shorten excerpt
-    const shortExcerpt = excerpt ? (excerpt.length > 300 ? excerpt.substring(0,300) + '...' : excerpt) : '';
+    // Prüfen ob Umgebungsvariablen gesetzt sind
+    if (!TELEGRAM_TOKEN || !CHAT_ID) {
+      console.error('Fehlende Umgebungsvariablen');
+      return res.status(500).json({ 
+        error: 'Configuration Error',
+        message: 'TELEGRAM_TOKEN oder CHAT_ID nicht gesetzt' 
+      });
+    }
 
-    const text = `🚨 *${level.toUpperCase()} ALERT*\n*${title}*\nSource: ${source}\n${shortExcerpt}\n🔗 ${url}`;
+    // Nachricht aus dem Request-Body extrahieren
+    const { message, title, priority } = req.body;
 
+    if (!message) {
+      return res.status(400).json({ 
+        error: 'Bad Request',
+        message: 'Keine Nachricht im Request-Body gefunden' 
+      });
+    }
+
+    // Nachricht formatieren
+    let telegramMessage = '';
+    
+    if (priority === 'CRITICAL' || priority === 'HIGH') {
+      telegramMessage += '🚨 **ALARM** 🚨\n\n';
+    } else {
+      telegramMessage += '⚠️ **Benachrichtigung** ⚠️\n\n';
+    }
+
+    if (title) {
+      telegramMessage += `**${title}**\n\n`;
+    }
+
+    telegramMessage += message;
+    
+    // Zeitstempel hinzufügen
+    const timestamp = new Date().toLocaleString('de-DE', { 
+      timeZone: 'Europe/Berlin',
+      dateStyle: 'short',
+      timeStyle: 'short'
+    });
+    telegramMessage += `\n\n_${timestamp}_`;
+
+    // Nachricht an Telegram senden
     const telegramUrl = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
-
-    const resp = await fetch(telegramUrl, {
+    
+    const response = await fetch(telegramUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         chat_id: CHAT_ID,
-        text,
+        text: telegramMessage,
         parse_mode: 'Markdown'
       })
     });
 
-    const j = await resp.json();
-    return res.status(200).json({ ok: true, telegram: j });
-  } catch (err) {
-    console.error('Webhook forwarder error:', err);
-    return res.status(500).json({ ok: false, error: String(err) });
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Telegram API Fehler:', data);
+      return res.status(500).json({ 
+        error: 'Telegram API Error',
+        details: data 
+      });
+    }
+
+    // Erfolgreiche Antwort
+    return res.status(200).json({ 
+      success: true,
+      message: 'Nachricht erfolgreich an Telegram gesendet',
+      telegram_response: data
+    });
+
+  } catch (error) {
+    console.error('Webhook Fehler:', error);
+    return res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: error.message 
+    });
   }
 }
+

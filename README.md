@@ -1,46 +1,185 @@
-# Telegram Webhook Forwarder (Manus AI -> Telegram)
+# Escape Alert Webhook
 
-This small project is a template to receive webhooks (e.g., from Manus AI) and forward them to a Telegram bot.
-It is designed to be deployed on **Vercel** (Serverless) but can be adapted to other Node.js hosts.
+Ein Webhook-System, das Benachrichtigungen von Manus AI empfängt und automatisch an Telegram weiterleitet.
 
-## Files
-- `api/webhook.js` — Serverless endpoint that accepts POST JSON and sends a Telegram message.
-- `vercel.json` — Minimal Vercel configuration for routing (optional).
-- `.gitignore` — ignores node_modules and env files.
+## 🎯 Zweck
 
-## How to use (quick)
+Dieses System dient als Frühwarnsystem für kritische Ereignisse (z.B. NATO Artikel 4, Kriegserklärungen, etc.). Manus AI überwacht Nachrichtenquellen und sendet bei erkannten Triggern sofort eine Benachrichtigung an diesen Webhook, der sie dann an Telegram weiterleitet.
 
-### Option A — Deploy on Vercel (recommended)
-1. Create a Vercel account (https://vercel.com) and install the Vercel CLI or use the web UI.
-2. Create a new project and import this repository (zip upload or GitHub).
-3. In Project Settings -> Environment Variables, add:
-   - `TELEGRAM_TOKEN` = your Telegram bot token (from @BotFather)
-   - `TELEGRAM_CHAT_ID` = your chat id (getUpdates or userinfobot)
-4. Deploy. Your webhook URL will be:
-   `https://<your-vercel-project>.vercel.app/api/webhook`
-5. In Manus AI, configure the agent to `Send Webhook` to that URL. Payload example:
-   ```json
-   {
-     "level": "high",
-     "title": "NATO invokes Article 4",
-     "excerpt": "North Atlantic Council convenes emergency session...",
-     "url": "https://www.nato.int/..",
-     "source": "nato.int"
-   }
+## 📋 Voraussetzungen
+
+- Telegram Bot (bereits erstellt: @EscapeAlert_bot)
+- Vercel Account
+- Vercel CLI (optional, für lokales Deployment)
+
+## 🚀 Deployment auf Vercel
+
+### Option 1: Vercel CLI (Empfohlen)
+
+1. **Vercel CLI installieren:**
+   ```bash
+   npm install -g vercel
    ```
 
-### Option B — Run locally (for testing)
-1. Install Node.js (v18+ recommended).
-2. `npm init -y && npm i node-fetch@2` (or use built-in fetch in Node 18+).
-3. Use a small Express wrapper to host the `api/webhook.js` logic locally.
-4. Use `ngrok` to expose `http://localhost:3000/api/webhook` to the internet and configure Manus to send to the ngrok URL.
+2. **In das Projektverzeichnis wechseln:**
+   ```bash
+   cd escape-alert-webhook
+   ```
 
-## Security notes
-- **Do NOT** commit your `TELEGRAM_TOKEN` into GitHub.
-- Use Vercel environment variables or a `.env` file locally.
-- Optionally add a simple secret header check: Manus can include a secret token in the webhook header and you verify it in `webhook.js`.
+3. **Bei Vercel anmelden:**
+   ```bash
+   vercel login
+   ```
 
-## Troubleshooting
-- If Telegram replies with an error, check `getUpdates` to ensure the bot was started by the chat/user (press /start in the chat).
-- If messages don't arrive, inspect Vercel function logs.
+4. **Projekt deployen:**
+   ```bash
+   vercel
+   ```
+   
+   Folge den Anweisungen:
+   - Setup and deploy? → **Yes**
+   - Which scope? → Wähle deinen Account
+   - Link to existing project? → **No**
+   - What's your project's name? → **escape-alert-webhook**
+   - In which directory is your code located? → **./** (Enter drücken)
+
+5. **Umgebungsvariablen setzen:**
+   ```bash
+   vercel env add TELEGRAM_TOKEN
+   ```
+   Wert eingeben: `8356157424:AAGYGLCuRNgYj4phD7r6UZeFsv5AvSjZwO8`
+   
+   ```bash
+   vercel env add CHAT_ID
+   ```
+   Wert eingeben: `464132580`
+
+6. **Erneut deployen mit Variablen:**
+   ```bash
+   vercel --prod
+   ```
+
+### Option 2: GitHub + Vercel Web Interface
+
+1. **GitHub Repository erstellen**
+2. **Code hochladen**
+3. **Vercel mit GitHub verbinden**
+4. **Umgebungsvariablen in Vercel Dashboard setzen:**
+   - `TELEGRAM_TOKEN` = `8356157424:AAGYGLCuRNgYj4phD7r6UZeFsv5AvSjZwO8`
+   - `CHAT_ID` = `464132580`
+
+## 🔧 Konfiguration
+
+### Umgebungsvariablen
+
+| Variable | Wert | Beschreibung |
+|----------|------|--------------|
+| `TELEGRAM_TOKEN` | `8356157424:AAGYGLCuRNgYj4phD7r6UZeFsv5AvSjZwO8` | Bot Token von @EscapeAlert_bot |
+| `CHAT_ID` | `464132580` | Deine persönliche Telegram Chat-ID |
+
+### Webhook URL
+
+Nach dem Deployment ist der Webhook erreichbar unter:
+```
+https://escape-alert-webhook.vercel.app/api/webhook
+```
+
+## 📡 API Verwendung
+
+### Request Format
+
+**Endpoint:** `POST /api/webhook`
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "message": "Kritisches Ereignis erkannt!",
+  "title": "NATO Artikel 4 aktiviert",
+  "priority": "CRITICAL"
+}
+```
+
+### Request Parameter
+
+| Parameter | Typ | Erforderlich | Beschreibung |
+|-----------|-----|--------------|--------------|
+| `message` | string | Ja | Die Hauptnachricht |
+| `title` | string | Nein | Titel der Benachrichtigung |
+| `priority` | string | Nein | `CRITICAL`, `HIGH`, `NORMAL` (Standard) |
+
+### Response Format
+
+**Erfolg (200):**
+```json
+{
+  "success": true,
+  "message": "Nachricht erfolgreich an Telegram gesendet",
+  "telegram_response": { ... }
+}
+```
+
+**Fehler (400/500):**
+```json
+{
+  "error": "Error Type",
+  "message": "Fehlerbeschreibung"
+}
+```
+
+## 🧪 Testen
+
+### Mit curl:
+```bash
+curl -X POST https://escape-alert-webhook.vercel.app/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Test Nachricht",
+    "title": "Test Alarm",
+    "priority": "CRITICAL"
+  }'
+```
+
+### Mit Postman:
+1. Neue POST-Request erstellen
+2. URL: `https://escape-alert-webhook.vercel.app/api/webhook`
+3. Body → raw → JSON
+4. Test-Payload einfügen
+5. Send klicken
+
+## 🔗 Integration mit Manus AI
+
+1. **In Manus AI Webhook-Einstellungen gehen**
+2. **Webhook-URL eintragen:**
+   ```
+   https://escape-alert-webhook.vercel.app/api/webhook
+   ```
+3. **Trigger definieren** (z.B. Keywords wie "Artikel 4", "Kriegserklärung", etc.)
+4. **Nachrichtenformat konfigurieren** (JSON mit `message`, `title`, `priority`)
+
+## 📊 Monitoring
+
+- Logs in Vercel Dashboard einsehen: https://vercel.com/dashboard
+- Telegram-Nachrichten überprüfen
+- Bei Problemen: Vercel Logs analysieren
+
+## 🛠️ Fehlerbehebung
+
+### Keine Nachrichten kommen an
+- Umgebungsvariablen in Vercel prüfen
+- Webhook-URL in Manus korrekt eingetragen?
+- Vercel Logs prüfen
+
+### Telegram API Fehler
+- Bot Token korrekt?
+- Chat-ID korrekt?
+- Bot wurde gestartet (/start gesendet)?
+
+## 📝 Lizenz
+
+MIT
 
