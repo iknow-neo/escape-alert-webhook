@@ -11,10 +11,6 @@
       "src": "/api/webhook",
       "dest": "/api/webhook.js"
     }
-  ],
-  "env": {
-    "TELEGRAM_TOKEN": "@telegram_token",
-    "CHAT_ID": "@chat_id"
-  }
+  ]
 }
 
